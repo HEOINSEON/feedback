@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>연수 후 강의 평가</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'primary-blue': '#10b981',
+                        'primary-dark': '#047857',
+                        'secondary-gray': '#f3f4f6',
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                }
+            }
+        }
+    </script>
+    <style>
+        /* 'Inter' 폰트 및 한국어 시스템 폰트 적용 */
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Oxygen", "Ubuntu", "Cantarell", "Fira Sans", "Droid Sans", "Helvetica Neue", sans-serif;
+            background-color: #f7f9fb;
+        }
+        .rating-label {
+            cursor: pointer;
+            transition: all 0.2s ease;
+            user-select: none;
+            border-radius: 0.5rem; /* rounded-lg */
+        }
+        input[type="radio"]:checked + .rating-label {
+            background-color: #10b981; /* primary-blue */
+            color: white;
+            box-shadow: 0 4px 6px -1px rgba(16, 185, 129, 0.5), 0 2px 4px -2px rgba(16, 185, 129, 0.5); /* shadow-lg on check */
+            transform: scale(1.05);
+        }
+        /* Hide default radio buttons */
+        input[type="radio"] {
+            display: none;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-4">
+
+    <div id="app" class="w-full max-w-2xl bg-white p-6 md:p-10 rounded-xl shadow-2xl space-y-8">
+        <header class="text-center space-y-2">
+            <h1 class="text-3xl font-extrabold text-gray-800">연수 후 강의 평가</h1>
+            <p class="text-gray-500 text-lg">귀한 의견을 남겨주시면 강의 개선에 큰 도움이 됩니다. (5점: 매우 만족 ~ 1점: 불만족)</p>
+        </header>
+
+        <form id="evaluationForm" class="space-y-6">
+            <!-- 평가 항목 목록 -->
+            <div id="question-list" class="space-y-6">
+                <!-- 질문 컴포넌트는 JavaScript로 동적 생성됩니다. -->
+            </div>
+
+            <!-- 기타 의견 (선택 사항) -->
+            <div class="space-y-3">
+                <label for="other_feedback" class="block text-lg font-semibold text-gray-700">6. 기타 의견 (선택 사항)</label>
+                <textarea id="other_feedback" name="other_feedback" rows="4" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-primary-blue focus:border-primary-blue transition duration-150" placeholder="자유로운 의견을 작성해 주세요."></textarea>
+            </div>
+
+            <!-- 메시지 표시 영역 -->
+            <div id="message-area" class="text-center"></div>
+
+            <!-- 제출 버튼 -->
+            <button type="submit" id="submitBtn" class="w-full bg-primary-blue hover:bg-primary-dark text-white font-bold py-3 rounded-xl shadow-lg transition duration-200 transform hover:scale-[1.01] focus:outline-none focus:ring-4 focus:ring-primary-blue focus:ring-opacity-50" disabled>
+                평가 제출하기
+            </button>
+        </form>
+
+    </div>
+
+    <script>
+        // 사용자께서 나중에 배포한 Google Apps Script Web App의 URL을 여기에 넣어주세요.
+        const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwpZShLIgS3bFkIyOrbt6IjuLOMbs4qBTKGg_WTcgVXEuj-fDfffkJqWD4wQYZaGhUT/exec";
+
+        const questions = [
+            { id: 'content_satisfaction', label: '1. 강의 내용 구성 만족도' },
+            { id: 'instructor_delivery', label: '2. 강사 전달력 만족도' },
+            { id: 'material_utilization', label: '3. 교재 및 자료 활용도' },
+            { id: 'practical_usefulness', label: '4. 실무 적용 및 유용성' },
+            { id: 'overall_recommendation', label: '5. 전반적인 추천 의향' },
+        ];
+
+        const ratings = [
+            { value: 5, text: '매우 만족' },
+            { value: 4, text: '만족' },
+            { value: 3, text: '보통' },
+            { value: 2, text: '불만족' },
+            { value: 1, text: '매우 불만족' }
+        ];
+
+        const questionList = document.getElementById('question-list');
+        const form = document.getElementById('evaluationForm');
+        const submitBtn = document.getElementById('submitBtn');
+        const messageArea = document.getElementById('message-area');
+
+        // 폼 필드 동적 생성 함수
+        function createQuestionElement(question) {
+            const container = document.createElement('div');
+            container.className = 'space-y-3 p-4 bg-secondary-gray rounded-lg border border-gray-200';
+
+            const label = document.createElement('label');
+            label.className = 'block text-lg font-semibold text-gray-700';
+            label.textContent = question.label;
+
+            const ratingContainer = document.createElement('div');
+            ratingContainer.className = 'flex flex-wrap justify-between gap-2';
+
+            ratings.forEach(rating => {
+                const inputId = `${question.id}-${rating.value}`;
+
+                const input = document.createElement('input');
+                input.type = 'radio';
+                input.id = inputId;
+                input.name = question.id;
+                input.value = rating.value;
+                input.required = true;
+
+                const ratingLabel = document.createElement('label');
+                ratingLabel.htmlFor = inputId;
+                ratingLabel.className = 'rating-label flex-1 text-center py-2 px-2 text-sm font-medium text-gray-600 bg-white border border-gray-300 hover:bg-gray-100 min-w-[70px]';
+                ratingLabel.textContent = rating.text;
+
+                ratingContainer.appendChild(input);
+                ratingContainer.appendChild(ratingLabel);
+            });
+
+            container.appendChild(label);
+            container.appendChild(ratingContainer);
+            questionList.appendChild(container);
+        }
+
+        // 모든 질문 항목 생성
+        questions.forEach(createQuestionElement);
+
+        // 폼 유효성 검사 및 버튼 활성화/비활성화
+        function checkValidity() {
+            // 모든 required 필드가 체크되었는지 확인
+            const isAllRequiredFilled = form.checkValidity();
+            submitBtn.disabled = !isAllRequiredFilled;
+        }
+
+        // 초기 유효성 검사 및 입력 이벤트 리스너 추가
+        document.addEventListener('DOMContentLoaded', () => {
+            checkValidity(); // 초기 상태 확인
+            form.addEventListener('change', checkValidity); // 라디오 버튼 선택 시마다 확인
+        });
+
+
+        // 폼 제출 처리 함수
+        async function submitEvaluation(event) {
+            event.preventDefault();
+
+            if (GAS_WEB_APP_URL.includes("YOUR_GOOGLE_APPS_SCRIPT_WEB_APP_URL_HERE")) {
+                showMessage("error", "Google Apps Script URL을 먼저 설정해 주세요.");
+                return;
+            }
+
+            // 모든 필수 항목이 채워졌는지 다시 확인
+            if (!form.checkValidity()) {
+                showMessage("error", "모든 평가 항목을 선택해 주세요.");
+                return;
+            }
+
+            submitBtn.textContent = '제출 중...';
+            submitBtn.disabled = true;
+            messageArea.innerHTML = '';
+
+            // 폼 데이터를 URLSearchParams 객체로 수집 (GET/POST 요청에 적합)
+            const formData = new FormData(form);
+            const data = new URLSearchParams();
+
+            for (const [key, value] of formData.entries()) {
+                data.append(key, value);
+            }
+
+            try {
+                // Google Apps Script는 기본적으로 application/x-www-form-urlencoded 형식의 POST 요청을 기대합니다.
+                const response = await fetch(GAS_WEB_APP_URL, {
+                    method: 'POST',
+                    mode: 'no-cors', // CORS 정책 우회를 위해 no-cors 모드 사용 (GAS 웹앱 특성)
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: data.toString()
+                });
+
+                // no-cors 모드에서는 응답 상태를 확인할 수 없으므로,
+                // 성공 메시지를 표시하고 폼을 초기화합니다.
+                showMessage("success", "✅ 평가가 성공적으로 제출되었습니다. 감사합니다!");
+                form.reset();
+                checkValidity(); // 폼 초기화 후 다시 버튼 비활성화
+                
+            } catch (error) {
+                console.error('제출 오류:', error);
+                showMessage("error", "❌ 제출 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.");
+            } finally {
+                submitBtn.textContent = '평가 제출하기';
+                submitBtn.disabled = false;
+            }
+        }
+
+        // 메시지 표시 유틸리티
+        function showMessage(type, content) {
+            let color, icon;
+            if (type === "success") {
+                color = "text-primary-blue";
+                icon = "👍";
+            } else if (type === "error") {
+                color = "text-red-500";
+                icon = "🚨";
+            }
+
+            messageArea.innerHTML = `
+                <div class="p-3 ${color} font-bold rounded-lg transition duration-300">
+                    ${icon} ${content}
+                </div>
+            `;
+        }
+
+        // 폼 제출 이벤트 리스너
+        form.addEventListener('submit', submitEvaluation);
+
+    </script>
+</body>
+</html>
